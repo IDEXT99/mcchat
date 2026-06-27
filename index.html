@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>NovaChat</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            obsidian: 'var(--bg-primary)',
+            charcoal: 'var(--bg-container)',
+            panel: '#1C1F2E',
+            'nc-border': '#252840',
+            'nc-accent': 'var(--accent)',
+          },
+          fontFamily: { display:['Space Grotesk','system-ui','sans-serif'], body:['Inter','system-ui','sans-serif'] },
+          keyframes: {
+            shake:   { '0%,100%':{transform:'translateX(0)'},'20%,60%':{transform:'translateX(-7px)'},'40%,80%':{transform:'translateX(7px)'} },
+            fadeIn:  { from:{opacity:'0'},to:{opacity:'1'} },
+            slideUp: { from:{opacity:'0',transform:'translateY(14px)'},to:{opacity:'1',transform:'translateY(0)'} },
+            blink:   { '0%,100%':{opacity:'1'},'50%':{opacity:'0.3'} },
+            ripple:  { '0%':{transform:'scale(0.8)',opacity:'1'},'100%':{transform:'scale(2.2)',opacity:'0'} },
+            glow:    { '0%,100%':{boxShadow:'0 0 8px rgba(0,242,254,0.3)'},'50%':{boxShadow:'0 0 22px rgba(0,242,254,0.7)'} },
+            swipeIn: { from:{transform:'translateX(-6px)',opacity:'0'},to:{transform:'translateX(0)',opacity:'1'} },
+          },
+          animation: {
+            shake:   'shake 0.38s ease',
+            fadeIn:  'fadeIn 0.3s ease',
+            slideUp: 'slideUp 0.28s ease',
+            blink:   'blink 1.1s infinite',
+            ripple:  'ripple 1s infinite',
+            glow:    'glow 2s infinite',
+            swipeIn: 'swipeIn 0.2s ease',
+          },
+          boxShadow: {
+            'accent-sm': '0 0 10px rgba(0,242,254,0.2)',
+            'accent-md': '0 0 22px rgba(0,242,254,0.3)',
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ── CSS Custom Properties (theme engine) ── */
+    :root {
+      --bg-primary: #090A0F;
+      --bg-container: #141622;
+      --accent: #00F2FE;
+      --accent-dim: #00b8c4;
+      --accent-muted: rgba(0,242,254,0.12);
+      --border: #252840;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: var(--bg-primary); color: #e2e8f0; font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+
+    /* ── Scrollbars ── */
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent-muted); }
+
+    /* ── Glassmorphism bubbles ── */
+    .bubble-out {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), rgba(0,60,100,0.28));
+      border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .bubble-in {
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.07);
+      backdrop-filter: blur(14px);
+    }
+
+    /* ── Reply quote bubble ── */
+    .reply-quote {
+      background: rgba(255,255,255,0.04);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 5px 10px;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: background .15s;
+      backdrop-filter: blur(8px);
+    }
+    .reply-quote:hover { background: rgba(255,255,255,0.07); }
+
+    /* ── Reply preview bar (above input) ── */
+    #replyPreview {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-container);
+      font-size: 12px;
+      color: #94a3b8;
+      animation: swipeIn 0.2s ease;
+    }
+    #replyPreview.active { display: flex; }
+    #replyPreview .reply-name { color: var(--accent); font-weight: 600; }
+
+    /* ── Neon focus ring ── */
+    .neon-focus:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); }
+
+    /* ── Active nav item ── */
+    .nav-active { border-left: 2px solid var(--accent) !important; background: var(--accent-muted) !important; color: var(--accent) !important; }
+
+    /* ── Typing dots ── */
+    .tdot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1.1s infinite; display: inline-block; }
+    .tdot:nth-child(2) { animation-delay: .18s; }
+    .tdot:nth-child(3) { animation-delay: .36s; }
+
+    /* ── Recording pulse ring ── */
+    .rec-ring::after { content:''; position:absolute; inset:0; border-radius:50%; background:rgba(239,68,68,0.35); animation: ripple 1s infinite; }
+
+    /* ── Emoji hover bar ── */
+    .emojis { opacity:0; pointer-events:none; transition:opacity .15s; }
+    .msg-row:hover .emojis { opacity:1; pointer-events:auto; }
+
+    /* ── Message action buttons ── */
+    .msg-actions { opacity:0; transition:opacity .15s; }
+    .msg-row:hover .msg-actions { opacity:1; }
+
+    /* ── Reaction badge ── */
+    .react-badge { font-size:12px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.11); border-radius:99px; padding:2px 7px; cursor:pointer; }
+    .react-badge:hover { background: var(--accent-muted); }
+
+    /* ── Status ticks ── */
+    .tick-single::after { content:'✓'; color:#64748b; font-size:10px; margin-left:4px; }
+    .tick-double::after { content:'✓✓'; color:var(--accent); font-size:10px; margin-left:4px; }
+
+    /* ── Audio player ── */
+    audio { filter:invert(1) hue-rotate(180deg); display:block; }
+    .audio-bubble { padding:8px !important; background:transparent !important; border:none !important; backdrop-filter:none !important; border-radius:12px !important; }
+
+    /* ── Edit inline input ── */
+    .edit-field { background: var(--accent-muted); border:1px solid color-mix(in srgb, var(--accent) 28%, transparent); border-radius:8px; color:#e2e8f0; padding:4px 10px; width:100%; outline:none; font-size:14px; }
+
+    /* ── Overlay fade ── */
+    .overlay-out { animation: fadeOut .45s ease forwards; pointer-events:none; }
+    @keyframes fadeOut { to { opacity:0; } }
+
+    /* ── Modal backdrop ── */
+    .modal-glass { background:rgba(9,10,15,0.82); backdrop-filter:blur(10px); }
+
+    /* ── Tab underline ── */
+    .tab-active { color:var(--accent); border-bottom:2px solid var(--accent); }
+
+    /* ── Presence dot ── */
+    .presence-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); display:inline-block; box-shadow:0 0 6px color-mix(in srgb, var(--accent) 90%, transparent); animation: glow 2s infinite; }
+
+    /* ── Utility ── */
+    .hidden { display:none !important; }
+    .fc { display:flex; align-items:center; justify-content:center; }
+    .sidebar-item { border-left:2px solid transparent; transition:background .15s, border-color .15s; cursor:pointer; }
+    .sidebar-item:hover { background: var(--accent-muted); border-left-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+
+    /* ── Neon button ── */
+    .btn-neon { background:linear-gradient(90deg, var(--accent), #0055ff); color:#090A0F; font-weight:600; border:none; cursor:pointer; transition:opacity .15s,box-shadow .15s; }
+    .btn-neon:hover { opacity:.9; box-shadow:0 0 18px color-mix(in srgb, var(--accent) 40%, transparent); }
+    .btn-neon:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+    .btn-ghost { background:rgba(255,255,255,0.04); border:1px solid var(--border); color:#94a3b8; cursor:pointer; transition:background .15s,border-color .15s; }
+    .btn-ghost:hover { background: var(--accent-muted); border-color: color-mix(in srgb, var(--accent) 30%, transparent); color:#e2e8f0; }
+    .btn-danger { background:rgba(220,38,38,0.1); border:1px solid rgba(220,38,38,0.4); color:#f87171; cursor:pointer; transition:background .15s; }
+    .btn-danger:hover { background:rgba(220,38,38,0.18); }
+
+    /* ── Responsive sidebar drawer ── */
+    #sidebar { transition: transform .25s ease; }
+    @media (max-width: 767px) {
+      #sidebar { position:fixed; top:0; left:0; bottom:0; z-index:30; transform:translateX(-100%); }
+      #sidebar.drawer-open { transform:translateX(0); }
+      #sidebarOverlay { display:block; }
+    }
+    #sidebarOverlay { display:none; }
+
+    /* ── NovaChat wordmark ── */
+    .wordmark { font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:.08em; }
+
+    .auth-label { font-size:11px; color:#64748b; letter-spacing:.12em; text-transform:uppercase; display:block; margin-bottom:7px; }
+    .auth-input { background: var(--bg-primary); border:1px solid var(--border); border-radius:12px; padding:10px 14px; color:#e2e8f0; font-size:14px; width:100%; }
+    .auth-input::placeholder { color:#334155; }
+
+    /* ── Call overlay ── */
+    #callOverlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(5,6,12,0.92);
+      backdrop-filter: blur(20px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #callOverlay.active { display: flex; }
+    #remoteVideo { width: 100%; max-height: 75vh; object-fit: cover; border-radius: 16px; background: #000; }
+    #localVideo { position: absolute; bottom: 100px; right: 20px; width: 120px; height: 90px; border-radius: 12px; object-fit: cover; background: #111; border: 2px solid rgba(255,255,255,0.2); }
+
+    /* ── Incoming call modal ── */
+    #incomingCallModal {
+      display: none;
+      position: fixed; inset: 0; z-index: 110;
+      background: rgba(9,10,15,0.88);
+      backdrop-filter: blur(16px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+    #incomingCallModal.active { display: flex; }
+
+    /* ── Swipe indicator ── */
+    .msg-swipe-indicator {
+      position: absolute;
+      left: -24px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent);
+      font-size: 16px;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+
+    /* ── Color swatch for theme picker ── */
+    .color-swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform .15s, border-color .15s; }
+    .color-swatch:hover, .color-swatch.selected { transform: scale(1.2); border-color: #fff; }
+
+    /* ── Scrollable emoji picker, never pushes layout ── */
+    #emojiPicker {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      z-index: 60;
+      background: rgba(20,22,34,0.95);
+      backdrop-filter: blur(16px);
+      border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      border-radius: 16px;
+      padding: 10px;
+      width: 248px;
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+      grid-template-columns: repeat(7,1fr);
+      gap: 4px;
+    }
+    #emojiPicker.open { display: grid; }
+
+    /* ── Attach menu ── */
+    #attachMenu {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      z-index: 60;
+      background: #1C1F2E;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 8px;
+      min-width: 145px;
+      display: none;
+      flex-direction: column;
+    }
+    #attachMenu.open { display: flex; }
+  </style>
+</head>
+<body class="h-full overflow-hidden">
+
+<!-- ══════════════════════════════════════════════
+     LAYER 1 — GLOBAL PASSWORD GATE
+══════════════════════════════════════════════ -->
+<div id="gateOverlay" class="fixed inset-0 z-50 fc flex-col gap-8" style="background:var(--bg-primary);">
+  <div class="absolute rounded-full" style="width:340px;height:340px;top:-100px;left:-100px;background:radial-gradient(circle,rgba(0,242,254,0.08),transparent 70%);pointer-events:none;"></div>
+  <div class="absolute rounded-full" style="width:280px;height:280px;bottom:-80px;right:-80px;background:radial-gradient(circle,rgba(0,85,255,0.08),transparent 70%);pointer-events:none;"></div>
+  <div class="relative z-10 fc flex-col gap-7 w-full max-w-xs px-6">
+    <div class="fc flex-col gap-3">
+      <div class="fc rounded-2xl animate-glow" style="width:56px;height:56px;background:var(--accent-muted);border:1px solid color-mix(in srgb,var(--accent) 30%, transparent);">
+        <svg style="width:24px;height:24px;color:var(--accent);" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 8l4 2.2v4.6L12 17l-4-2.2v-4.6L12 8z"/></svg>
+      </div>
+      <h1 class="wordmark text-xl" style="color:#e2e8f0;">NOVA<span style="color:var(--accent);">CHAT</span></h1>
+      <p class="text-xs text-center" style="color:#475569;">Private access only. Enter the gateway code to continue.</p>
+    </div>
+    <div class="flex flex-col gap-3 w-full">
+      <input id="gateInput" type="password" inputmode="numeric" placeholder="Gateway code" autocomplete="off"
+        class="auth-input neon-focus text-center tracking-widest transition-all"/>
+      <p id="gateError" class="text-red-400 text-xs text-center transition-opacity" style="opacity:0;">Incorrect code. Try again.</p>
+      <button id="gateSubmit" class="btn-neon w-full py-3 rounded-xl text-sm">Enter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     LAYER 2 — AUTH HUB
+══════════════════════════════════════════════ -->
+<div id="authHub" class="hidden fixed inset-0 z-40 fc" style="background:var(--bg-primary);">
+  <div class="absolute rounded-full" style="width:380px;height:380px;top:-120px;right:-120px;background:radial-gradient(circle,rgba(0,242,254,0.06),transparent 70%);pointer-events:none;"></div>
+  <div class="relative z-10 w-full max-w-sm mx-4 rounded-2xl overflow-hidden animate-slideUp" style="background:var(--bg-container);border:1px solid var(--border);">
+    <div class="fc flex-col gap-2 pt-8 pb-2">
+      <div class="fc rounded-xl" style="width:42px;height:42px;background:var(--accent-muted);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);">
+        <svg style="width:18px;height:18px;color:var(--accent);" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 8l4 2.2v4.6L12 17l-4-2.2v-4.6L12 8z"/></svg>
+      </div>
+      <h1 class="wordmark text-lg">NOVA<span style="color:var(--accent);">CHAT</span></h1>
+    </div>
+    <div class="flex" style="border-bottom:1px solid var(--border);">
+      <button id="tabLogin" onclick="switchTab('login')" class="flex-1 py-3.5 text-sm font-semibold transition-colors tab-active" style="background:transparent;border:none;border-bottom:2px solid var(--accent);cursor:pointer;">Login</button>
+      <button id="tabCreate" onclick="switchTab('create')" class="flex-1 py-3.5 text-sm font-semibold transition-colors text-slate-500" style="background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;">Create Account</button>
+    </div>
+    <!-- Login panel -->
+    <div id="panelLogin" class="p-7 flex flex-col gap-4">
+      <div>
+        <label class="auth-label">Name</label>
+        <input id="loginName" type="text" autocomplete="off" class="auth-input neon-focus w-full" placeholder="Your name"/>
+      </div>
+      <div>
+        <label class="auth-label">Password</label>
+        <input id="loginPass" type="password" autocomplete="off" class="auth-input neon-focus w-full" placeholder="••••••••"/>
+      </div>
+      <p id="loginError" class="text-red-400 text-xs" style="min-height:14px;"></p>
+      <button id="loginBtn" class="btn-neon w-full py-3 rounded-xl text-sm">Log In</button>
+      <button id="forgotLink" class="text-xs text-center transition-colors" style="background:none;border:none;cursor:pointer;color:#64748b;">Forgot password?</button>
+    </div>
+    <!-- Create account panel -->
+    <div id="panelCreate" class="hidden p-7 flex flex-col gap-4">
+      <div class="fc">
+        <div id="regAvatarPreview" class="fc rounded-full overflow-hidden cursor-pointer relative" style="width:64px;height:64px;border:2px dashed var(--border);">
+          <label class="fc absolute inset-0 cursor-pointer" style="color:#475569;">
+            <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <input id="regPhoto" type="file" accept="image/*" class="hidden"/>
+          </label>
+        </div>
+      </div>
+      <p class="text-center text-xs" style="color:#475569;margin-top:-8px;">Profile picture (optional)</p>
+      <div>
+        <label class="auth-label">Name</label>
+        <input id="regName" type="text" autocomplete="off" class="auth-input neon-focus w-full" placeholder="Pick a name"/>
+      </div>
+      <div>
+        <label class="auth-label">Password</label>
+        <input id="regPass" type="password" autocomplete="off" class="auth-input neon-focus w-full" placeholder="••••••••"/>
+      </div>
+      <p id="regError" class="text-red-400 text-xs" style="min-height:14px;"></p>
+      <button id="registerBtn" class="btn-neon w-full py-3 rounded-xl text-sm">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     LAYER 3 — MAIN APP SHELL
+══════════════════════════════════════════════ -->
+<div id="appShell" class="hidden h-full" style="background:var(--bg-primary);">
+  <div id="sidebarOverlay" class="fixed inset-0 z-20" style="background:rgba(0,0,0,0.5);"></div>
+
+  <div class="h-full flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="flex flex-col shrink-0" style="width:280px;background:var(--bg-container);border-right:1px solid var(--border);">
+      <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid var(--border);">
+        <h1 class="wordmark text-base">NOVA<span style="color:var(--accent);">CHAT</span></h1>
+        <button id="closeSidebarBtn" class="md:hidden text-slate-500" style="background:none;border:none;cursor:pointer;">✕</button>
+      </div>
+      <!-- My profile -->
+      <div class="flex items-center gap-3 px-5 py-4" style="border-bottom:1px solid var(--border);">
+        <div id="myAvatarWrap" class="fc rounded-full overflow-hidden shrink-0" style="width:40px;height:40px;border:1px solid var(--accent);">
+          <img id="myAvatar" src="" style="width:100%;height:100%;object-fit:cover;"/>
+        </div>
+        <div class="flex-1 overflow-hidden">
+          <p id="myName" class="text-sm font-semibold truncate text-white"></p>
+          <p class="text-xs" style="color:#475569;">You</p>
+        </div>
+        <button id="openEditProfile" title="Edit profile" class="btn-ghost fc rounded-lg shrink-0" style="width:32px;height:32px;border-radius:9px;">
+          <svg style="width:15px;height:15px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6c.6-.34 1-.95 1-1.51V3a2 2 0 114 0v.09c0 .6.4 1.17 1 1.51.34.2.74.3 1.15.27.41-.03.8-.2 1.13-.5l.06-.06a2 2 0 112.83 2.83l-.06.06c-.3.33-.47.72-.5 1.13a1.6 1.6 0 00.27 1.15c.34.6.95 1 1.51 1H21a2 2 0 110 4h-.09c-.6 0-1.17.4-1.51 1z"/></svg>
+        </button>
+      </div>
+      <!-- Channels -->
+      <nav class="flex-1 overflow-y-auto py-2">
+        <p class="px-5 pt-3 pb-1.5 text-xs font-semibold tracking-wider" style="color:#3d4263;">CHANNELS</p>
+        <div id="groupChannelBtn" class="sidebar-item nav-active flex items-center gap-3 px-5 py-2.5">
+          <div class="fc rounded-full shrink-0" style="width:34px;height:34px;background:var(--accent-muted);">
+            <svg style="width:15px;height:15px;color:var(--accent);" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          <span class="text-sm font-medium">Main Group Chat</span>
+        </div>
+        <p class="px-5 pt-4 pb-1.5 text-xs font-semibold tracking-wider" style="color:#3d4263;">DIRECT MESSAGES</p>
+        <div id="dmList" class="flex flex-col"></div>
+      </nav>
+      <!-- Admin tools -->
+      <div id="adminEntry" class="hidden px-5 py-3" style="border-top:1px solid var(--border);">
+        <button id="openAdminPanel" class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium btn-ghost">
+          <svg style="width:15px;height:15px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Maintenance Panel
+        </button>
+      </div>
+      <!-- Logout -->
+      <div class="px-5 py-4" style="border-top:1px solid var(--border);">
+        <button id="logoutBtn" class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm btn-ghost">
+          <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          Log Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Chat area -->
+    <main class="flex-1 flex flex-col min-w-0">
+      <!-- Chat header -->
+      <header class="flex items-center gap-3 px-4 py-3.5 shrink-0" style="border-bottom:1px solid var(--border);background:#0d0f1a;">
+        <button id="hamburgerBtn" class="md:hidden btn-ghost fc rounded-lg" style="width:34px;height:34px;border-radius:9px;">
+          <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div id="headerAvatarWrap" class="fc rounded-full overflow-hidden shrink-0" style="width:34px;height:34px;">
+          <img id="headerAvatar" src="" style="width:100%;height:100%;object-fit:cover;"/>
+        </div>
+        <div class="flex-1 overflow-hidden">
+          <p id="headerTitle" class="text-sm font-semibold truncate text-white">Main Group Chat</p>
+          <p id="headerSubtitle" class="text-xs truncate" style="color:#475569;">Everyone can see this channel</p>
+        </div>
+        <!-- Call buttons (DM only) -->
+        <div id="callBtns" class="hidden items-center gap-2">
+          <button id="voiceCallBtn" title="Voice call" class="btn-ghost fc rounded-lg" style="width:34px;height:34px;border-radius:9px;">
+            <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 8.8a19.79 19.79 0 01-3.07-8.67 2 2 0 012-2.18h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.09 6.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+          </button>
+          <button id="videoCallBtn" title="Video call" class="btn-ghost fc rounded-lg" style="width:34px;height:34px;border-radius:9px;">
+            <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Messages -->
+      <div id="msgArea" class="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-3"></div>
+
+      <!-- Typing bar -->
+      <div id="typingBar" class="hidden px-5 pb-1.5 flex items-center gap-2">
+        <span id="typingText" class="text-xs" style="color:var(--accent);"></span>
+        <span class="tdot"></span><span class="tdot"></span><span class="tdot"></span>
+      </div>
+
+      <!-- Composer -->
+      <div class="shrink-0" style="border-top:1px solid var(--border);background:#0d0f1a;">
+        <!-- Reply preview -->
+        <div id="replyPreview">
+          <svg style="width:13px;height:13px;color:var(--accent);flex-shrink:0;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+          <span>Replying to <span id="replyToName" class="reply-name"></span>: <span id="replyToPreview" style="opacity:.7;"></span></span>
+          <button id="cancelReply" style="background:none;border:none;cursor:pointer;color:#64748b;margin-left:auto;font-size:16px;line-height:1;">×</button>
+        </div>
+
+        <div class="px-4 py-3.5">
+          <!-- Voice recording UI -->
+          <div id="voiceUI" class="hidden items-center gap-3">
+            <div class="relative fc rec-ring" style="width:36px;height:36px;">
+              <div class="fc rounded-full z-10 relative" style="width:36px;height:36px;background:#dc2626;">
+                <svg style="width:15px;height:15px;color:#fff;" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 0014 0h-2z"/></svg>
+              </div>
+            </div>
+            <span id="recTimer" class="font-mono text-sm" style="color:#f87171;">0:00</span>
+            <span class="text-xs flex-1" style="color:#475569;">Recording…</span>
+            <button id="cancelRec" class="btn-ghost text-xs px-3 py-1.5 rounded-lg">Cancel</button>
+            <button id="stopRec" class="btn-neon text-xs px-4 py-1.5 rounded-lg">Send</button>
+          </div>
+
+          <!-- Normal input row -->
+          <div id="normalInput" class="flex items-end gap-2">
+            <!-- Emoji -->
+            <div class="relative shrink-0">
+              <button id="emojiBtn" title="Emoji" class="btn-ghost fc rounded-xl transition-all" style="width:38px;height:38px;border-radius:12px;">
+                <svg style="width:17px;height:17px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+              </button>
+              <div id="emojiPicker"></div>
+            </div>
+
+            <!-- Attach -->
+            <div class="relative shrink-0">
+              <button id="attachBtn" title="Attach" class="btn-ghost fc rounded-xl transition-all" style="width:38px;height:38px;border-radius:12px;">
+                <svg style="width:17px;height:17px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <div id="attachMenu">
+                <button id="cameraBtn" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left btn-ghost" style="border:none;">
+                  <svg style="width:15px;height:15px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  Camera
+                </button>
+                <button id="galleryBtn" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-left btn-ghost" style="border:none;">
+                  <svg style="width:15px;height:15px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  Gallery
+                </button>
+              </div>
+            </div>
+
+            <!-- Textarea -->
+            <textarea id="msgInput" rows="1" placeholder="Message…"
+              class="flex-1 rounded-xl px-4 py-2.5 text-sm text-white neon-focus transition-all resize-none"
+              style="background:#0d0f1a;border:1px solid var(--border);max-height:110px;line-height:1.55;"></textarea>
+
+            <!-- Mic -->
+            <button id="micBtn" class="btn-ghost fc rounded-xl shrink-0 transition-all" style="width:38px;height:38px;border-radius:12px;">
+              <svg style="width:17px;height:17px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            </button>
+
+            <!-- Send -->
+            <button id="sendBtn" class="btn-neon fc rounded-xl shrink-0" style="width:38px;height:38px;border-radius:12px;">
+              <svg style="width:17px;height:17px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     WEBRTC CALL OVERLAY
+══════════════════════════════════════════════ -->
+<div id="callOverlay">
+  <div class="relative w-full max-w-2xl mx-4" style="max-height:80vh;">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="localVideo" autoplay playsinline muted></video>
+    <div id="callStatus" class="absolute top-4 left-1/2 -translate-x-1/2 text-sm font-medium px-4 py-1.5 rounded-full" style="background:rgba(0,0,0,0.6);color:#e2e8f0;backdrop-filter:blur(8px);">Calling…</div>
+  </div>
+  <div class="flex items-center gap-4 mt-6">
+    <button id="callMuteBtn" title="Mute" class="btn-ghost fc rounded-full" style="width:52px;height:52px;border-radius:50%;">
+      <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+    </button>
+    <button id="callVideoToggleBtn" title="Camera" class="btn-ghost fc rounded-full" style="width:52px;height:52px;border-radius:50%;">
+      <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    </button>
+    <button id="callFlipBtn" title="Flip camera" class="btn-ghost fc rounded-full" style="width:52px;height:52px;border-radius:50%;">
+      <svg style="width:20px;height:20px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    </button>
+    <button id="hangUpBtn" class="fc rounded-full" style="width:60px;height:60px;border-radius:50%;background:#dc2626;border:none;cursor:pointer;">
+      <svg style="width:22px;height:22px;color:#fff;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 003.01 3.01l1.5-1.5a2 2 0 012.08-.44 13.22 13.22 0 004.06 1.3 2 2 0 011.67 2v3.08a2 2 0 01-2.18 2 19.81 19.81 0 01-8.63-3.07A19.5 19.5 0 013.07 8.79a19.81 19.81 0 01-3.07-8.63A2 2 0 012 0h3.08a2 2 0 012 1.67 13.22 13.22 0 001.3 4.06 2 2 0 01-.44 2.08L6.44 9.31"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     INCOMING CALL MODAL
+══════════════════════════════════════════════ -->
+<div id="incomingCallModal">
+  <div class="fc rounded-full" style="width:72px;height:72px;background:var(--accent-muted);border:2px solid var(--accent);">
+    <svg style="width:30px;height:30px;color:var(--accent);" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+  </div>
+  <div class="text-center">
+    <p class="text-sm" style="color:#94a3b8;">Incoming call from</p>
+    <p id="incomingCallerName" class="text-lg font-bold text-white mt-1"></p>
+  </div>
+  <div class="flex gap-5 mt-2">
+    <button id="declineCallBtn" class="fc rounded-full" style="width:60px;height:60px;border-radius:50%;background:#dc2626;border:none;cursor:pointer;">
+      <svg style="width:22px;height:22px;color:#fff;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M10.68 13.31a16 16 0 003.01 3.01l1.5-1.5a2 2 0 012.08-.44 13.22 13.22 0 004.06 1.3 2 2 0 011.67 2v3.08a2 2 0 01-2.18 2 19.81 19.81 0 01-8.63-3.07A19.5 19.5 0 013.07 8.79a19.81 19.81 0 01-3.07-8.63A2 2 0 012 0h3.08a2 2 0 012 1.67 13.22 13.22 0 001.3 4.06 2 2 0 01-.44 2.08L6.44 9.31"/></svg>
+    </button>
+    <button id="acceptCallBtn" class="fc rounded-full" style="width:60px;height:60px;border-radius:50%;background:#16a34a;border:none;cursor:pointer;">
+      <svg style="width:22px;height:22px;color:#fff;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════ -->
+
+<!-- Edit Profile Modal -->
+<div id="editProfileModal" class="fixed inset-0 z-50 fc modal-glass hidden">
+  <div class="w-full max-w-xs mx-4 rounded-2xl p-7 animate-slideUp" style="background:var(--bg-container);border:1px solid var(--border);">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-semibold text-white">Edit Profile</h3>
+      <button id="closeEditProfile" class="text-slate-500 hover:text-white text-xl leading-none" style="background:none;border:none;cursor:pointer;">×</button>
+    </div>
+    <div class="fc mb-5">
+      <div id="editAvatarPreview" class="fc rounded-full overflow-hidden cursor-pointer relative group"
+        style="width:70px;height:70px;border:2px solid var(--accent);box-shadow:0 0 12px color-mix(in srgb,var(--accent) 30%,transparent);">
+        <label class="absolute inset-0 fc cursor-pointer" style="background:rgba(0,0,0,0.4);opacity:0;transition:opacity .15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">
+          <svg style="width:20px;height:20px;color:#fff;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <input id="editPhoto" type="file" accept="image/*" class="hidden"/>
+        </label>
+      </div>
+    </div>
+    <div class="flex flex-col gap-3">
+      <div>
+        <label class="auth-label">Display Name</label>
+        <input id="editName" type="text" maxlength="20" class="auth-input neon-focus w-full"/>
+      </div>
+      <p id="editError" class="text-red-400 text-xs" style="min-height:14px;"></p>
+      <button id="saveProfile" class="btn-neon w-full py-3 rounded-xl text-sm">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Forgot Password Modal -->
+<div id="forgotModal" class="fixed inset-0 z-50 fc modal-glass hidden">
+  <div class="w-full max-w-xs mx-4 rounded-2xl p-7 animate-slideUp" style="background:var(--bg-container);border:1px solid var(--border);">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-semibold text-white">Recover Password</h3>
+      <button id="closeForgot" class="text-slate-500 hover:text-white text-xl leading-none" style="background:none;border:none;cursor:pointer;">×</button>
+    </div>
+    <div id="forgotStep1" class="flex flex-col gap-4">
+      <p class="text-xs" style="color:#64748b;">Enter your username and the master recovery code to reset your password.</p>
+      <div>
+        <label class="auth-label">Username</label>
+        <input id="forgotUsername" type="text" class="auth-input neon-focus w-full" autocomplete="off"/>
+      </div>
+      <div>
+        <label class="auth-label">Recovery Code</label>
+        <input id="forgotCode" type="text" class="auth-input neon-focus w-full" autocomplete="off"/>
+      </div>
+      <p id="forgotError" class="text-red-400 text-xs" style="min-height:14px;"></p>
+      <button id="forgotVerifyBtn" class="btn-neon w-full py-3 rounded-xl text-sm">Verify</button>
+    </div>
+    <div id="forgotStep2" class="hidden flex-col gap-4">
+      <p class="text-xs" style="color:#64748b;">Set a new password for <strong id="forgotUser2" style="color:var(--accent);"></strong>.</p>
+      <div>
+        <label class="auth-label">New Password</label>
+        <input id="forgotNewPass" type="password" class="auth-input neon-focus w-full"/>
+      </div>
+      <p id="forgotError2" class="text-red-400 text-xs" style="min-height:14px;"></p>
+      <button id="forgotSaveBtn" class="btn-neon w-full py-3 rounded-xl text-sm">Update Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Camera Modal -->
+<div id="cameraModal" class="fixed inset-0 z-50 fc modal-glass hidden">
+  <div class="w-full rounded-2xl overflow-hidden" style="max-width:480px;margin:0 12px;background:var(--bg-container);border:1px solid var(--border);">
+    <div class="flex items-center justify-between px-5 py-4" style="border-bottom:1px solid var(--border);">
+      <h3 class="font-semibold text-white">Camera</h3>
+      <button id="closeCam" class="text-slate-500 hover:text-white text-xl leading-none" style="background:none;border:none;cursor:pointer;">×</button>
+    </div>
+    <div class="p-4 flex flex-col items-center gap-4">
+      <video id="camVideo" autoplay playsinline muted class="rounded-xl w-full" style="max-height:300px;background:#000;"></video>
+      <canvas id="camCanvas" class="hidden"></canvas>
+      <button id="snapBtn" class="btn-neon px-8 py-2.5 rounded-xl text-sm">📸 Snap Photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin / Maintenance Modal -->
+<div id="adminModal" class="fixed inset-0 z-50 fc modal-glass hidden">
+  <div class="w-full max-w-sm mx-4 rounded-2xl overflow-hidden animate-slideUp" style="background:var(--bg-container);border:1px solid var(--border);">
+    <div class="flex items-center justify-between px-6 py-4" style="border-bottom:1px solid var(--border);">
+      <h3 class="font-semibold text-white flex items-center gap-2">
+        <svg style="width:15px;height:15px;color:var(--accent);" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Maintenance Panel
+      </h3>
+      <button id="closeAdmin" class="text-slate-500 hover:text-white text-xl leading-none" style="background:none;border:none;cursor:pointer;">×</button>
+    </div>
+
+    <!-- Admin tabs -->
+    <div class="flex" style="border-bottom:1px solid var(--border);">
+      <button id="adminTabTools" class="flex-1 py-2.5 text-xs font-semibold tab-active" style="background:transparent;border:none;border-bottom:2px solid var(--accent);cursor:pointer;">Tools</button>
+      <button id="adminTabTheme" class="flex-1 py-2.5 text-xs font-semibold text-slate-500" style="background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;">Theme</button>
+      <button id="adminTabMonitor" class="flex-1 py-2.5 text-xs font-semibold text-slate-500" style="background:transparent;border:none;border-bottom:2px solid transparent;cursor:pointer;">P2P Monitor</button>
+    </div>
+
+    <!-- Tools tab -->
+    <div id="adminPanelTools" class="p-6 flex flex-col gap-3">
+      <p class="text-xs leading-relaxed" style="color:#64748b;">Manage shared app data. Actions only affect group chat or stale media — never private DMs.</p>
+      <button id="wipeGroupBtn" class="flex items-center justify-between px-4 py-3 rounded-xl text-sm btn-ghost">
+        <span>Wipe Group Chat</span><span style="color:#475569;font-size:11px;">clears chats/group</span>
+      </button>
+      <button id="storageCleanupBtn" class="flex items-center justify-between px-4 py-3 rounded-xl text-sm btn-ghost">
+        <span>Storage Cleanup</span><span style="color:#475569;font-size:11px;">media &gt;12h old</span>
+      </button>
+      <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+      <button id="resetDbBtn" class="flex items-center justify-between px-4 py-3 rounded-xl text-sm btn-danger">
+        <span>Full Database Reset</span><span style="font-size:11px;opacity:.8;">destructive</span>
+      </button>
+      <p id="adminStatus" class="text-xs" style="min-height:14px;color:#34d399;"></p>
+    </div>
+
+    <!-- Theme tab -->
+    <div id="adminPanelTheme" class="hidden p-6 flex flex-col gap-4">
+      <p class="text-xs" style="color:#64748b;">Changes propagate to all connected clients in real-time via Firebase.</p>
+      <div>
+        <label class="auth-label">Background Color</label>
+        <div class="flex items-center gap-3 mt-2">
+          <input id="themeBg" type="color" value="#090A0F" class="rounded cursor-pointer" style="width:40px;height:32px;border:1px solid var(--border);background:transparent;padding:2px;"/>
+          <span id="themeBgHex" class="text-xs font-mono" style="color:#64748b;">#090A0F</span>
+        </div>
+      </div>
+      <div>
+        <label class="auth-label">Container Color</label>
+        <div class="flex items-center gap-3 mt-2">
+          <input id="themeContainer" type="color" value="#141622" class="rounded cursor-pointer" style="width:40px;height:32px;border:1px solid var(--border);background:transparent;padding:2px;"/>
+          <span id="themeContainerHex" class="text-xs font-mono" style="color:#64748b;">#141622</span>
+        </div>
+      </div>
+      <div>
+        <label class="auth-label">Accent Color</label>
+        <div class="flex items-center gap-3 mt-2">
+          <input id="themeAccent" type="color" value="#00F2FE" class="rounded cursor-pointer" style="width:40px;height:32px;border:1px solid var(--border);background:transparent;padding:2px;"/>
+          <span id="themeAccentHex" class="text-xs font-mono" style="color:#64748b;">#00F2FE</span>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-1">
+        <button id="saveThemeBtn" class="btn-neon flex-1 py-2.5 rounded-xl text-sm">Apply to All</button>
+        <button id="resetThemeBtn" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Reset Default</button>
+      </div>
+      <p id="themeStatus" class="text-xs" style="min-height:14px;color:#34d399;"></p>
+    </div>
+
+    <!-- P2P Monitor tab -->
+    <div id="adminPanelMonitor" class="hidden p-6 flex flex-col gap-3">
+      <p class="text-xs" style="color:#64748b;">Active WebRTC signaling rooms in Firebase.</p>
+      <button id="refreshMonitorBtn" class="btn-ghost text-xs px-4 py-2 rounded-xl">Refresh</button>
+      <div id="monitorList" class="flex flex-col gap-2 text-xs" style="color:#94a3b8;max-height:180px;overflow-y:auto;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal (generic) -->
+<div id="confirmModal" class="fixed inset-0 z-50 fc modal-glass hidden">
+  <div class="w-full max-w-xs mx-4 rounded-2xl p-6 animate-slideUp" style="background:var(--bg-container);border:1px solid var(--border);">
+    <h3 id="confirmTitle" class="font-semibold text-white mb-2">Are you sure?</h3>
+    <p id="confirmBody" class="text-xs leading-relaxed mb-5" style="color:#64748b;"></p>
+    <div class="flex gap-3">
+      <button id="confirmCancel" class="btn-ghost flex-1 py-2.5 rounded-xl text-sm">Cancel</button>
+      <button id="confirmOk" class="btn-danger flex-1 py-2.5 rounded-xl text-sm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gallery file input -->
+<input id="galleryInput" type="file" accept="image/*" class="hidden"/>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
